@@ -1,0 +1,9 @@
+Anders/
+checkpoint/
+logs/
+configs/
+*.pickle
+*.h5
+*.png
+*.pyc
+__pycache__/
