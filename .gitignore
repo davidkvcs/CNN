@@ -2,6 +2,7 @@ Anders/
 checkpoint/
 logs/
 configs/
+build/
 *.pickle
 *.h5
 *.png
