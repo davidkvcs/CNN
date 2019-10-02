@@ -63,7 +63,7 @@ class CNN():
         # Metrics and loss functions
         self.loss_functions = [ ['mse',1] ]
         self.metrics = ['accuracy']
-        self.custom_metrics = dict()
+        self.custom_objects = dict()
         self.is_compiled = False
 
         # Update with overwritten params
@@ -108,11 +108,11 @@ class CNN():
         # Resume previous training:
         if self.config['initial_epoch'] > 0:
             print("Resuming from model: {}".format(self.config['model_resume']))
-            self.model = load_model(self.config['model_resume'], custom_objects=self.custom_metrics)
+            self.model = load_model(self.config['model_resume'], custom_objects=self.custom_objects)
         # Transfer learn from model saved new-style
         elif self.config['pretrained_model'] and self.config['pretrained_models'].endswith('.h5'):    
             print("Transfer learning from model: {}".format(self.config['pretrained_model']))
-            self.model = load_model(self.config['model_resume'], custom_objects=self.custom_metrics)
+            self.model = load_model(self.config['model_resume'], custom_objects=self.custom_objects)
         else:
             # TL form model saved old-style
             if self.config['pretrained_model']:

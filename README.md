@@ -88,7 +88,7 @@ cnn.custom_network_architecture = customNET
 
 cnn.metrics.append('mse')
 cnn.metrics.append(rmse)
-cnn.custom_metrics['rmse'] = rmse
+cnn.custom_objects['rmse'] = rmse
 cnn.compile_network()
 
 cnn.train()    
@@ -108,7 +108,7 @@ cnn = CNN(model_name='v1',
 cnn.data_loader = DataGenerator(cnn.config)  
 
 cnn.loss_functions=[[rmse,1]]
-cnn.custom_metrics['rmse'] = rmse
+cnn.custom_objects['rmse'] = rmse
 cnn.compile_network()
 
 cnn.train()    
