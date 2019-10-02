@@ -35,7 +35,6 @@ class CNN():
         self.config["checkpoint_save_rate"] = 10
         self.config["initial_epoch"] = 0
         self.config["learning_rate"] = 1e-4
-        self.config["loss_functions"] = [ ['mse',1] ]
         self.config["data_folder"] = '' # Path to folder containing data
         self.config["data_pickle"] = '' # Path to pickle containing train/validation splits
         self.config["data_pickle_kfold"] = None # Set to fold if k-fold training is applied (key will e.g. be train_0 and valid_0)
@@ -57,7 +56,15 @@ class CNN():
         self.config['model_resume'] = None
 
         # Config specific for network architecture
+        self.config["network_architecture"] = 'unet'
         self.config['n_base_filters'] = 32
+        self.custom_network_architecture = None
+        
+        # Metrics and loss functions
+        self.loss_functions = [ ['mse',1] ]
+        self.metrics = ['accuracy']
+        self.custom_metrics = dict()
+        self.is_compiled = False
 
         # Update with overwritten params
         for k,v in kwargs.items():
@@ -73,36 +80,10 @@ class CNN():
 
         # Check if model has been trained (and can be overwritten), or if we should resume from checkpoint
         self.check_model_existance()
-
-        """ SETUP MODEL """
-
-        # Setup network
         
-        # Resume previous training:
-        if self.config['initial_epoch'] > 0:
-            print("Resuming from model: {}".format(self.config['model_resume']))
-            self.model = load_model(self.config['model_resume']) # custom_objects={'rmse': losses.rmse}
-        # Transfer learn from model saved new-style
-        elif self.config['pretrained_model'] and self.config['pretrained_models'].endswith('.h5'):    
-            print("Transfer learning from model: {}".format(self.config['pretrained_model']))
-            self.model = load_model(self.config['model_resume']) # custom_objects={'rmse': losses.rmse}
-        else:
-            # TL form model saved old-style
-            if self.config['pretrained_model']:
-                print("Transfer learning from model: {}".format(self.config['pretrained_model']))
-                self.model = self.load_model_w_json(self.config['pretrained_model'])
-            # No TL, build from scratch
-            else:
-                self.model = self.build_network()
-        
-            optimizer = Adam(self.config['learning_rate'])
-            loss, loss_weights = zip(*self.config['loss_functions'])
-            loss = list(loss)
-            loss_weights = list(loss_weights)
-            self.model.compile(loss = loss, loss_weights = loss_weights, optimizer = optimizer)
-
         # Setup callbacks
         self.callbacks_list = self.setup_callbacks()
+
 
     def setup_callbacks(self):
 
@@ -118,6 +99,38 @@ class CNN():
 
         return [checkpoint, TB]
     
+    def compile_network(self):
+        
+        """ SETUP MODEL """
+        
+        # Setup network
+        
+        # Resume previous training:
+        if self.config['initial_epoch'] > 0:
+            print("Resuming from model: {}".format(self.config['model_resume']))
+            self.model = load_model(self.config['model_resume'], custom_objects=self.custom_metrics)
+        # Transfer learn from model saved new-style
+        elif self.config['pretrained_model'] and self.config['pretrained_models'].endswith('.h5'):    
+            print("Transfer learning from model: {}".format(self.config['pretrained_model']))
+            self.model = load_model(self.config['model_resume'], custom_objects=self.custom_metrics)
+        else:
+            # TL form model saved old-style
+            if self.config['pretrained_model']:
+                print("Transfer learning from model: {}".format(self.config['pretrained_model']))
+                self.model = self.load_model_w_json(self.config['pretrained_model'])
+            # No TL, build from scratch
+            else:
+                self.model = self.build_network()
+        
+            optimizer = Adam(self.config['learning_rate'])
+            loss, loss_weights = zip(*self.loss_functions)
+            loss = list(loss)
+            loss_weights = list(loss_weights)
+            
+            self.model.compile(loss = loss, loss_weights = loss_weights, optimizer = optimizer, metrics=self.metrics)
+            
+        self.is_compiled = True
+    
     def load_model_w_json(self,model):
         modelh5name = os.path.join( os.path.dirname(model), os.path.splitext(os.path.basename(model))[0]+'.h5' )
         json_file = open(model,'r')
@@ -127,9 +140,20 @@ class CNN():
         model.load_weights(modelh5name)
         return model
 
-    def build_network(self):
-        inputs = Input(shape=self.config['input_patch_shape']+(self.config['input_channels'],))
-        outputs = networks.unet(inputs,f=self.config['n_base_filters'],dims_out=self.config['output_channels'])
+    def build_network(self,inputs=None):
+        if not inputs:
+            inputs = Input(shape=self.config['input_patch_shape']+(self.config['input_channels'],))
+            
+        if self.config['network_architecture'] == 'unet':
+            outputs = networks.unet(inputs,f=self.config['n_base_filters'],dims_out=self.config['output_channels'])
+            
+        elif self.config['network_architecture'] == 'custom' and not self.custom_network_architecture == None:
+            outputs = self.custom_network_architecture(inputs,config=self.config)
+        
+        else:
+            print("You are using a network that I dont know..")
+            exit(-1)
+
         return Model(inputs=inputs,outputs=outputs)
 
     def generate_model_name_from_params(self):
@@ -181,6 +205,10 @@ class CNN():
         self.config[key] = value
 
     def train(self):
+        
+        # Compile network if it has not been done:
+        if not self.is_compiled:
+            self.compile_network()
         
         # Check if data generators has been attached
         if hasattr(self,'data_loader'):

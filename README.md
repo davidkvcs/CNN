@@ -56,3 +56,61 @@ sudo mkdir /opt/caai
 sudo chown -R <user>:<group> /opt/caai
 ```
 Proceed to install with "make install" without sudo.
+
+## Examples for usage
+
+### hello-world example
+Example setting only model name, data directory and train/valid splits.
+```
+cnn = CNN(model_name='v1',
+          data_pickle='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc/data_6fold.pickle',
+          data_folder='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc'
+      )
+cnn.data_loader = DataGenerator(cnn.config)  
+
+cnn.train()    
+```
+
+### Custom network and metrics example
+Use of custom network architecture and metrics imported from elsewhere.
+
+```
+from networks import customNET
+from CAAI.losses import rmse
+
+cnn = CNN(model_name='v1',
+          data_pickle='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc/data_6fold.pickle',
+          data_folder='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc'
+      )
+cnn.data_loader = DataGenerator(cnn.config)  
+
+cnn.custom_network_architecture = customNET
+
+cnn.metrics.append('mse')
+cnn.metrics.append(rmse)
+cnn.custom_metrics['rmse'] = rmse
+cnn.compile_network()
+
+cnn.train()    
+```
+
+### Custom loss
+Use of custom losses
+
+```
+from networks import customNET
+from CAAI.losses import rmse
+
+cnn = CNN(model_name='v1',
+          data_pickle='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc/data_6fold.pickle',
+          data_folder='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc'
+      )
+cnn.data_loader = DataGenerator(cnn.config)  
+
+cnn.loss_functions=[[rmse,1]]
+cnn.custom_metrics['rmse'] = rmse
+cnn.compile_network()
+
+cnn.train()    
+```
+    

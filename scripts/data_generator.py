@@ -51,7 +51,7 @@ class DataGenerator():
             y[i,...] = tgt.reshape(self.img_res + (self.output_channels,))
             
         if train_or_test.startswith('train') and self.augmentation:
-            dat, tgt = self.data_augmentation.random_transform_batch(X,y)
+            X, y = self.data_augmentation.random_transform_batch(X,y)
 
         return X,y
 

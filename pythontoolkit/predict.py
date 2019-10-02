@@ -5,7 +5,7 @@ import pickle
 from keras.models import load_model, model_from_json
 
 class CNN():
-    def __init__(self,model,config=None):
+    def __init__(self,model,config=None,custom_objects={}):
         
         if config:
             self.config = pickle.load(open(config,'rb'))
@@ -15,7 +15,7 @@ class CNN():
         if model.endswith('.json'):
             self.model = self.load_model_w_json(model)
         else:
-            self.model = load_model(model)
+            self.model = load_model(model,custom_objects=custom_objects)
 
 
     def load_model_w_json(self,model):
