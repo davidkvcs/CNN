@@ -4,13 +4,13 @@ import pickle, os
 import numpy as np
 
 def train_v1():
-    cnn = CNN(model_name='lowdose_cardiac_test_v1',
+    cnn = CNN(model_name='lowdose_cardiac_test_v2',
               input_patch_shape=(128,128,16),
               input_channels=2,
               output_channels=1,
               batch_size=2,
               epochs=50,
-              learning_rate=1e-5,
+              learning_rate=1e-3,
               checkpoint_save_rate=10,
               loss_functions=[['mean_absolute_error',1]],
               data_pickle='test_dat.pickle',
