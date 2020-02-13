@@ -113,4 +113,6 @@ cnn.compile_network()
 
 cnn.train()    
 ```
+
+#### github test / DGK
     
