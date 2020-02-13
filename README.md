@@ -115,3 +115,8 @@ cnn.train()
 ```
  
 ### Testing change on branch developer_david   
+```
+testing this again 
+hej 
+
+```
