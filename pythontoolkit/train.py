@@ -146,6 +146,9 @@ class CNN():
             
         if self.config['network_architecture'] == 'unet':
             outputs = networks.unet(inputs,f=self.config['n_base_filters'],dims_out=self.config['output_channels'])
+
+        if self.config['network_architecture'] == 'unet_8_slice':
+            outputs = networks.unet_8_slice(inputs,f=self.config['n_base_filters'],dims_out=self.config['output_channels'])
             
         elif self.config['network_architecture'] == 'custom' and not self.custom_network_architecture == None:
             outputs = self.custom_network_architecture(inputs,config=self.config)
