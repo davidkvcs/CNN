@@ -11,6 +11,7 @@ INSTALL(PROGRAMS
   networks.py
   train.py
   predict.py
+  jaj_plot.py
   
   DESTINATION CAAI )
 

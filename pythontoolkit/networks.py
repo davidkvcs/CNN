@@ -64,7 +64,13 @@ def unet(X, f, dims_out):
                     kernel_initializer='he_normal', padding='same',strides=1, activation='relu')(block14)
     return output
 
-def unet_8_slice(X, f, dims_out):
+def unet_8_slice(X, config):
+    print('---------------------')
+    print('---------------------')
+    print('Running unet_8_slice')
+    print('---------------------')
+    print('---------------------')
+    f, dims_out = config['n_base_filters'],config['output_channels']
     def conv_block(layer,fsize,dropout,downsample=True):
         for i in range(1,3):
             layer = Conv3D(fsize, kernel_size=3, kernel_regularizer=regularizers.l2(1e-1), 
@@ -106,7 +112,10 @@ def unet_8_slice(X, f, dims_out):
     block9 = convt_block(block8,block1,f)
     block10, _ = conv_block(block9,f,dropout[6],downsample=False)
 
-    output = Conv3D(dims_out,kernel_size=3, kernel_regularizer=regularizers.l2(1e-1), 
+    block11 = Conv3D(dims_out,kernel_size=3, kernel_regularizer=regularizers.l2(1e-1), 
                     kernel_initializer='he_normal', padding='same',strides=1, activation='relu')(block10)
+
+    output = Activation('sigmoid')(block11)
+
     return output
 

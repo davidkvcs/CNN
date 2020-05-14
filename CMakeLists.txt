@@ -2,8 +2,9 @@ project (rh-scripts)
 
 cmake_minimum_required (VERSION 2.8)
 
+#/opt/bin was changed to /homes/kovacs/toolbox for local installation
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-    set (CMAKE_INSTALL_PREFIX "/opt/caai" CACHE PATH "default install path" FORCE )
+    set (CMAKE_INSTALL_PREFIX "/homes/kovacs/toolbox" CACHE PATH "default install path" FORCE )
 endif()
 
 # Add python-lib

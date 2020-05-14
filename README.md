@@ -35,6 +35,8 @@ If your training is interrupted, you can resume from last saved checkpoint by ju
 again, it will automatically resume training if you did not modify any of the parameters in the config.
 
 ## HOW TO INSTALL
+Ensure CMakeLists.txt is set to copy to a folder, which you can write to. For example change '/opt/bin' to your own toolbox location, '/homes/*username*/toolbox'
+
 ```
 mkdir build
 cd build
@@ -43,6 +45,7 @@ make install
 ```
 ## POST INSTALLATION
 Add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile 
+In the above replace /opt/caai/ with the location where cnn toolbox is intalled, for instance "/toolbox/".
 
 ## KNOWN ISSUES
 
@@ -80,7 +83,8 @@ from CAAI.losses import rmse
 
 cnn = CNN(model_name='v1',
           data_pickle='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc/data_6fold.pickle',
-          data_folder='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc'
+          data_folder='/users/claes/projects/LowdosePET/PETrecon/HjerteFDG_mnc',
+          network_architecture = 'custom'#DGK added
       )
 cnn.data_loader = DataGenerator(cnn.config)  
 
@@ -114,5 +118,4 @@ cnn.compile_network()
 cnn.train()    
 ```
 
-### testing change on sonne
 
