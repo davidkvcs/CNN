@@ -1,6 +1,6 @@
 # Import python libraries:
-from train import CNN
-from predict import CNN as TrainedModel
+from CAAI.train import CNN
+from CAAI.predict import CNN as TrainedModel
 import pickle, os
 import numpy as np
 from data_generator import DataGenerator

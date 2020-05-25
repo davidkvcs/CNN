@@ -4,7 +4,7 @@ warnings.filterwarnings('ignore')
 import os
 import pickle
 from glob import glob
-import networks
+import CAAI.networks
 import json
 from keras.callbacks import ModelCheckpoint, TensorBoard
 from keras.layers import Input

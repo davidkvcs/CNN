@@ -1,5 +1,5 @@
 # Import python libraries:
-from DataAugmentation3D import DataAugmentation3D
+from CAAI.DataAugmentation3D import DataAugmentation3D
 import pickle
 import numpy as np
 
