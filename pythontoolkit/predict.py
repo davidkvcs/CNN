@@ -17,7 +17,6 @@ class CNN():
         else:
             self.model = load_model(model,custom_objects=custom_objects)
 
-
     def load_model_w_json(self,model):
         modelh5name = os.path.join( os.path.dirname(model), os.path.splitext(os.path.basename(model))[0]+'.h5' )
         json_file = open(model,'r')
