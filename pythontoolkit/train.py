@@ -1,4 +1,5 @@
 # Import python libraries:
+import tensorflow as tf
 import warnings
 warnings.filterwarnings('ignore')
 import os
@@ -6,10 +7,10 @@ import pickle
 from glob import glob
 from CAAI import networks
 import json
-from keras.callbacks import ModelCheckpoint, TensorBoard
-from keras.layers import Input
-from keras.models import Model, load_model, model_from_json
-from keras.optimizers import Adam
+from tf.keras.callbacks import ModelCheckpoint, TensorBoard
+from tf.keras.layers import Input
+from tf.keras.models import Model, load_model, model_from_json
+from tf.keras.optimizers import Adam
 
 
 # Define Convolutional Neural Network class.

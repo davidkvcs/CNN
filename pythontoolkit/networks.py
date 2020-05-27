@@ -3,13 +3,13 @@ Created on Thu May 24 10:57:19 2018
 
 @author: claesnl
 """
-
+import tensorflow as tf
 import warnings
-from keras.models import Model
-from keras.optimizers import Adam
-from keras.layers import Conv3D, Conv3DTranspose, Dropout, Input
-from keras.layers import Activation, BatchNormalization, concatenate
-from keras import regularizers
+from tf.keras.models import Model
+from tf.keras.optimizers import Adam
+from tf.keras.layers import Conv3D, Conv3DTranspose, Dropout, Input
+from tf.keras.layers import Activation, BatchNormalization, concatenate
+from tf.keras import regularizers
 
 warnings.filterwarnings('ignore')
 

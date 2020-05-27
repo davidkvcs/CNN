@@ -1,8 +1,9 @@
+import tensorflow as tf
 import warnings
 warnings.filterwarnings('ignore')
 import os
 import pickle
-from keras.models import load_model, model_from_json
+from tf.keras.models import load_model, model_from_json
 
 class CNN():
     def __init__(self,model,config=None,custom_objects={}):
