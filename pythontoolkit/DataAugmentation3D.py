@@ -5,11 +5,12 @@ https://github.com/fchollet/keras/blob/master/keras/preprocessing/image.py
 Fairly basic set of tools for real-time data augmentation on the volumetric
 data. Extended for 3D objects augmentation.
 """
-
-import keras.backend as K
+import tensorflow as tf
+from tensorflow import keras
+import tensorflow.keras.backend as K
 import numpy as np
 import scipy.ndimage
-from keras.utils.data_utils import Sequence
+from tensorflow.keras.utils import Sequence
 from scipy import linalg
 from six.moves import range
 

@@ -1,8 +1,10 @@
+import tensorflow as tf
+from tensorflow import keras
 import warnings
 warnings.filterwarnings('ignore')
 import os
 import pickle
-from keras.models import load_model, model_from_json
+from tensorflow.keras.models import load_model, model_from_json
 
 class CNN():
     def __init__(self,model,config=None,custom_objects={}):
@@ -16,7 +18,6 @@ class CNN():
             self.model = self.load_model_w_json(model)
         else:
             self.model = load_model(model,custom_objects=custom_objects)
-
 
     def load_model_w_json(self,model):
         modelh5name = os.path.join( os.path.dirname(model), os.path.splitext(os.path.basename(model))[0]+'.h5' )

@@ -1,3 +1,6 @@
+# Import python libraries:
+import tensorflow as tf
+from tensorflow import keras
 import warnings
 warnings.filterwarnings('ignore')
 import os
@@ -5,33 +8,25 @@ import pickle
 from glob import glob
 from CAAI import networks
 import json
-from keras.callbacks import ModelCheckpoint, TensorBoard
-from keras.layers import Input
-from keras.models import Model, load_model, model_from_json
-from keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model, load_model, model_from_json
+from tensorflow.keras.optimizers import Adam
 
 
-
-"""
-
-TODO:
- - Check content of existing CONFIG matches new run if continue
- - Delete checkpoints if running overwriting already trained model.
- - Generate data pickle file
-
-
-"""
-
+# Define Convolutional Neural Network class.
 class CNN():
+    
+    # Define default configurations, which will be used if no other configurations are defined.
     def __init__(self,**kwargs):
         self.config = dict()
         self.config["model_name"] = 'PROJECT_NAME_WITH_VERSION_NUMBER'
         self.config["overwrite"] = False
-        self.config["input_patch_shape"] = (16,192,240)
+        self.config["input_patch_shape"] = (8,256,256)
         self.config["input_channels"] = 2
         self.config["output_channels"] = 1
-        self.config["batch_size"] = 2
-        self.config["epochs"] = 100
+        self.config["batch_size"] = 1
+        self.config["epochs"] = 1000
         self.config["checkpoint_save_rate"] = 10
         self.config["initial_epoch"] = 0
         self.config["learning_rate"] = 1e-4
@@ -39,7 +34,7 @@ class CNN():
         self.config["data_pickle"] = '' # Path to pickle containing train/validation splits
         self.config["data_pickle_kfold"] = None # Set to fold if k-fold training is applied (key will e.g. be train_0 and valid_0)
         self.config["pretrained_model"] = None # If transfer learning from other model (not used if resuming training, but keep for model_name's sake)
-        self.config["augmentation"] = True
+        self.config["augmentation"] = False
         self.config["augmentation_params"] = {
                                                     #'rotation_range': [5,5,5],
                                                     'shift_range': [0.05,0.05,0.05],
@@ -57,7 +52,7 @@ class CNN():
 
         # Config specific for network architecture
         self.config["network_architecture"] = 'unet'
-        self.config['n_base_filters'] = 32
+        self.config['n_base_filters'] = 64
         self.custom_network_architecture = None
         
         # Metrics and loss functions
@@ -80,17 +75,14 @@ class CNN():
 
         # Check if model has been trained (and can be overwritten), or if we should resume from checkpoint
         self.check_model_existance()
-        
-        # Setup callbacks
-        self.callbacks_list = self.setup_callbacks()
 
 
     def setup_callbacks(self):
 
         # Checkpoints
         os.makedirs('checkpoint/{}'.format(self.config['model_name']), exist_ok=True)
-        checkpoint_file=os.path.join('checkpoint',self.config["model_name"],'e{epoch:02d}_{val_loss:.2f}.h5')
-        checkpoint = ModelCheckpoint(checkpoint_file, monitor='val_loss', verbose=1, save_best_only=False, mode='min',period=self.config["checkpoint_save_rate"])
+        checkpoint_file=os.path.join('checkpoint',self.config["model_name"],'e{epoch:02d}.h5')
+        checkpoint = ModelCheckpoint(checkpoint_file, monitor='val_loss', verbose=1, save_best_only=False, mode='min',save_freq=int(self.config['checkpoint_save_rate']*self.data_loader.n_batches))
 
         # Tensorboard        
         os.makedirs('logs', exist_ok=True)
@@ -98,6 +90,7 @@ class CNN():
         TB = TensorBoard(log_dir = TB_file)
 
         return [checkpoint, TB]
+
     
     def compile_network(self):
         
@@ -130,6 +123,7 @@ class CNN():
             self.model.compile(loss = loss, loss_weights = loss_weights, optimizer = optimizer, metrics=self.metrics)
             
         self.is_compiled = True
+
     
     def load_model_w_json(self,model):
         modelh5name = os.path.join( os.path.dirname(model), os.path.splitext(os.path.basename(model))[0]+'.h5' )
@@ -139,6 +133,7 @@ class CNN():
         model = model_from_json(model_json)
         model.load_weights(modelh5name)
         return model
+
 
     def build_network(self,inputs=None):
         if not inputs:
@@ -156,6 +151,7 @@ class CNN():
 
         return Model(inputs=inputs,outputs=outputs)
 
+
     def generate_model_name_from_params(self):
         # Build full model name
         model_name = self.config['model_name']
@@ -169,10 +165,12 @@ class CNN():
 
         return model_name
 
+
     def get_initial_epoch_from_file(self,f):
         last_epoch = f.split('/')[-1].split('_')[0]
         assert last_epoch.startswith('e') # check that it is indeed the epoch part of the name that we extract
-        return int(last_epoch[1:]) # extract only integer part of eXXX
+        return int(last_epoch[1:-3]) # extract only integer part of eXXX
+
 
     def check_model_existance(self):
         # Check if config file already exists
@@ -198,22 +196,53 @@ class CNN():
             # else -> model exists but we specified to overwrite, so we do so, without loading from the checkpoint folder. 
             # OBS: The checkpoints should probably be cleared before starting?
 
+
     def print_config(self):
         print(json.dumps(self.config, indent = 4))
+
 
     def set(self,key,value):
         self.config[key] = value
 
+    def plot_model(self):
+        # Compile network if it has not been done:
+        if not self.is_compiled:
+            self.compile_network()
+
+        tf.keras.utils.plot_model(self.model, show_shapes=True, 
+            to_file='model_fig.png')
+
     def train(self):
+
+        # Setup callbacks
+        self.callbacks_list = self.setup_callbacks()
         
         # Compile network if it has not been done:
         if not self.is_compiled:
             self.compile_network()
         
+        print(self.model.summary())
+
         # Check if data generators has been attached
         if hasattr(self,'data_loader'):
-            self.training_generator = self.data_loader.generate( self.config['train_pts'] )
-            self.validation_generator = self.data_loader.generate( self.config['valid_pts'] )
+            #self.training_generator = self.data_loader.generate( self.config['train_pts'] )
+            #self.validation_generator = self.data_loader.generate( self.config['valid_pts'] )
+
+            # Updated to TFv2 generator
+            generator_shape_input = self.config["input_patch_shape"]+tuple([self.config["input_channels"]])
+            generator_shape_output = self.config["input_patch_shape"]+tuple([self.config["output_channels"]])
+            self.training_generator = tf.data.Dataset.from_generator(
+                lambda: self.data_loader.generate( self.config['train_pts'] ), 
+                output_types=(tf.float32,tf.float32), 
+                output_shapes=(tf.TensorShape(generator_shape_input),tf.TensorShape(generator_shape_output)))
+            self.validation_generator = tf.data.Dataset.from_generator(
+                lambda: self.data_loader.generate( self.config['valid_pts'] ), 
+                output_types=(tf.float32,tf.float32), 
+                output_shapes=(tf.TensorShape(generator_shape_input),tf.TensorShape(generator_shape_output)))
+
+            self.training_generator = self.training_generator.batch(self.config["batch_size"])
+            self.validation_generator = self.validation_generator.batch(self.config["batch_size"])
+   
         else:
             print("No data generator was attached.")
             exit(-1)
@@ -223,14 +252,14 @@ class CNN():
         with open('configs/{}.pkl'.format(self.config["model_name"]), 'wb') as file_pi:
             pickle.dump(self.config, file_pi)
 
-        history = self.model.fit_generator(generator = self.training_generator,
-                                           steps_per_epoch = self.data_loader.n_batches,
-                                           validation_data = self.validation_generator,
-                                           validation_steps = 1,
-                                           epochs = self.config['epochs'],
-                                           verbose = 1,
-                                           callbacks = self.callbacks_list,
-                                           initial_epoch = self.config['initial_epoch'] )
+        history = self.model.fit(  self.training_generator,
+                                   steps_per_epoch = self.data_loader.n_batches,
+                                   validation_data = self.validation_generator,
+                                   validation_steps = 1,
+                                   epochs = self.config['epochs'],
+                                   verbose = 1,
+                                   callbacks = self.callbacks_list,
+                                   initial_epoch = self.config['initial_epoch'] )
 
         # Save model
         self.model.save('{}.h5'.format( self.config['model_name'] ))
