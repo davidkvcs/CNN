@@ -7,7 +7,6 @@ import numpy as np
 class DataGenerator():
 
     def __init__(self, config):
-        self.batch_size = config['batch_size']
         self.img_res = config['input_patch_shape']
         self.input_channels = config['input_channels']
         self.output_channels = config['output_channels']
@@ -23,7 +22,7 @@ class DataGenerator():
         self.tgt_name = 'minc/res_256_truex1_256_CT.npy'
 
         self.n_batches = len(self.summary['train']) if 'train' in self.summary else len(self.summary['train_0'])
-        self.n_batches /= self.batch_size
+        self.n_batches /= config['batch_size']
 
     def generate(self, train_or_test):
         while 1:
@@ -31,15 +30,9 @@ class DataGenerator():
             yield X, y
 
     def __data_generation(self, train_or_test):
-        X = np.empty( (self.batch_size,) + self.img_res + (self.input_channels,) )
-        y = np.empty( (self.batch_size,) + self.img_res + (self.output_channels,) )
-
-        for i in range(self.batch_size):
-
-            dat,tgt = self.load(train_or_test,load_mode='memmap')
-
-            X[i,...] = dat
-            y[i,...] = tgt.reshape(self.img_res + (self.output_channels,))
+        X,y = self.load(train_or_test,load_mode='memmap')
+        X = X.reshape(self.img_res + (self.input_channels,))
+        y = y.reshape(self.img_res + (self.output_channels,))
             
         if train_or_test.startswith('train') and self.augmentation:
             X, y = self.data_augmentation.random_transform_batch(X,y)

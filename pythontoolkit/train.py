@@ -1,5 +1,6 @@
 # Import python libraries:
 import tensorflow as tf
+from tensorflow import keras
 import warnings
 warnings.filterwarnings('ignore')
 import os
@@ -7,10 +8,10 @@ import pickle
 from glob import glob
 from CAAI import networks
 import json
-from tf.keras.callbacks import ModelCheckpoint, TensorBoard
-from tf.keras.layers import Input
-from tf.keras.models import Model, load_model, model_from_json
-from tf.keras.optimizers import Adam
+from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model, load_model, model_from_json
+from tensorflow.keras.optimizers import Adam
 
 
 # Define Convolutional Neural Network class.
@@ -74,17 +75,14 @@ class CNN():
 
         # Check if model has been trained (and can be overwritten), or if we should resume from checkpoint
         self.check_model_existance()
-        
-        # Setup callbacks
-        self.callbacks_list = self.setup_callbacks()
 
 
     def setup_callbacks(self):
 
         # Checkpoints
         os.makedirs('checkpoint/{}'.format(self.config['model_name']), exist_ok=True)
-        checkpoint_file=os.path.join('checkpoint',self.config["model_name"],'e{epoch:02d}_{val_loss:.2f}.h5')
-        checkpoint = ModelCheckpoint(checkpoint_file, monitor='val_loss', verbose=1, save_best_only=False, mode='min',period=self.config["checkpoint_save_rate"])
+        checkpoint_file=os.path.join('checkpoint',self.config["model_name"],'e{epoch:02d}.h5')
+        checkpoint = ModelCheckpoint(checkpoint_file, monitor='val_loss', verbose=1, save_best_only=False, mode='min',save_freq=int(self.config['checkpoint_save_rate']*self.data_loader.n_batches))
 
         # Tensorboard        
         os.makedirs('logs', exist_ok=True)
@@ -171,7 +169,7 @@ class CNN():
     def get_initial_epoch_from_file(self,f):
         last_epoch = f.split('/')[-1].split('_')[0]
         assert last_epoch.startswith('e') # check that it is indeed the epoch part of the name that we extract
-        return int(last_epoch[1:]) # extract only integer part of eXXX
+        return int(last_epoch[1:-3]) # extract only integer part of eXXX
 
 
     def check_model_existance(self):
@@ -206,17 +204,45 @@ class CNN():
     def set(self,key,value):
         self.config[key] = value
 
+    def plot_model(self):
+        # Compile network if it has not been done:
+        if not self.is_compiled:
+            self.compile_network()
+
+        tf.keras.utils.plot_model(self.model, show_shapes=True, 
+            to_file='model_fig.png')
 
     def train(self):
+
+        # Setup callbacks
+        self.callbacks_list = self.setup_callbacks()
         
         # Compile network if it has not been done:
         if not self.is_compiled:
             self.compile_network()
         
+        print(self.model.summary())
+
         # Check if data generators has been attached
         if hasattr(self,'data_loader'):
-            self.training_generator = self.data_loader.generate( self.config['train_pts'] )
-            self.validation_generator = self.data_loader.generate( self.config['valid_pts'] )
+            #self.training_generator = self.data_loader.generate( self.config['train_pts'] )
+            #self.validation_generator = self.data_loader.generate( self.config['valid_pts'] )
+
+            # Updated to TFv2 generator
+            generator_shape_input = self.config["input_patch_shape"]+tuple([self.config["input_channels"]])
+            generator_shape_output = self.config["input_patch_shape"]+tuple([self.config["output_channels"]])
+            self.training_generator = tf.data.Dataset.from_generator(
+                lambda: self.data_loader.generate( self.config['train_pts'] ), 
+                output_types=(tf.float32,tf.float32), 
+                output_shapes=(tf.TensorShape(generator_shape_input),tf.TensorShape(generator_shape_output)))
+            self.validation_generator = tf.data.Dataset.from_generator(
+                lambda: self.data_loader.generate( self.config['valid_pts'] ), 
+                output_types=(tf.float32,tf.float32), 
+                output_shapes=(tf.TensorShape(generator_shape_input),tf.TensorShape(generator_shape_output)))
+
+            self.training_generator = self.training_generator.batch(self.config["batch_size"])
+            self.validation_generator = self.validation_generator.batch(self.config["batch_size"])
+   
         else:
             print("No data generator was attached.")
             exit(-1)
@@ -226,14 +252,14 @@ class CNN():
         with open('configs/{}.pkl'.format(self.config["model_name"]), 'wb') as file_pi:
             pickle.dump(self.config, file_pi)
 
-        history = self.model.fit_generator(generator = self.training_generator,
-                                           steps_per_epoch = self.data_loader.n_batches,
-                                           validation_data = self.validation_generator,
-                                           validation_steps = 1,
-                                           epochs = self.config['epochs'],
-                                           verbose = 1,
-                                           callbacks = self.callbacks_list,
-                                           initial_epoch = self.config['initial_epoch'] )
+        history = self.model.fit(  self.training_generator,
+                                   steps_per_epoch = self.data_loader.n_batches,
+                                   validation_data = self.validation_generator,
+                                   validation_steps = 1,
+                                   epochs = self.config['epochs'],
+                                   verbose = 1,
+                                   callbacks = self.callbacks_list,
+                                   initial_epoch = self.config['initial_epoch'] )
 
         # Save model
         self.model.save('{}.h5'.format( self.config['model_name'] ))

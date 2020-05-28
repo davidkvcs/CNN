@@ -6,18 +6,21 @@ import numpy as np
 from data_generator import DataGenerator
 import pyminc.volumes.factory as pyminc
 
+#change path to your data folder
 data_path = '/homes/kovacs/project_data/lymphoma-auto-contouring/'
+
 
 # Define training function:
 def train_v1():
     
     # Parameter definition for the network. These must be changed to fit your own data. Other parameters exist. See train.py
-    cnn = CNN(model_name='v2_test_david',
+    cnn = CNN(model_name='v7_tf==2.2',
               input_patch_shape=(256,256,8), # Dimensions of model input in the form (x,y,z)
+              overwrite = True,
               input_channels=2, # Number of model input channels. In this case, PET in 1st channel, CT in 2nd channel.
               output_channels=1, # Number of model output channels. In this case, a PET image as output.
               batch_size=1, # Number of inputs used in batch normalization. 1 = no batch normalization.
-              epochs=100, # Number of training epochs. A stopping critera can also be implemented.
+              epochs=3, # Number of training epochs. A stopping critera can also be implemented.
               learning_rate=1e-4, # Set learning rate.
               checkpoint_save_rate=50, # Saves model each # epoch.
               loss_functions=[['mean_absolute_error',1]], # Define loss function
@@ -29,7 +32,9 @@ def train_v1():
     # Attach generator
     cnn.data_loader = DataGenerator(cnn.config) # Load data generator
 
+    #printint model
     cnn.print_config() # Print network configurations
+    #cnn.plot_model()
 
     final_model_name = cnn.train() # Create training network
     

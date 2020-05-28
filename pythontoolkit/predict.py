@@ -1,9 +1,10 @@
 import tensorflow as tf
+from tensorflow import keras
 import warnings
 warnings.filterwarnings('ignore')
 import os
 import pickle
-from tf.keras.models import load_model, model_from_json
+from tensorflow.keras.models import load_model, model_from_json
 
 class CNN():
     def __init__(self,model,config=None,custom_objects={}):

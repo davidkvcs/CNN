@@ -1,5 +1,6 @@
 import tensorflow as tf
-from tf.keras import backend as K
+from tensorflow import keras
+from tensorflow.keras import backend as K
 
 # Define root mean sqared error loss function.
 def rmse(y_true, y_pred):

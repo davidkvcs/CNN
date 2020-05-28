@@ -4,18 +4,24 @@ Created on Thu May 24 10:57:19 2018
 @author: claesnl
 """
 import tensorflow as tf
+from tensorflow import keras
 import warnings
-from tf.keras.models import Model
-from tf.keras.optimizers import Adam
-from tf.keras.layers import Conv3D, Conv3DTranspose, Dropout, Input
-from tf.keras.layers import Activation, BatchNormalization, concatenate
-from tf.keras import regularizers
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Conv3D, Conv3DTranspose, Dropout, Input
+from tensorflow.keras.layers import Activation, BatchNormalization, concatenate
+from tensorflow.keras import regularizers
 
 warnings.filterwarnings('ignore')
 
 # Define u-net structure.
 def unet(X, f, dims_out):
-    
+    '''
+    Inputs:
+        X   inputs
+        f   n_base_filters
+        dims_out    output dimensions of network
+    '''
     # Define convolution block:
     def conv_block(layer,fsize,dropout,downsample=True):
         for i in range(1,3):

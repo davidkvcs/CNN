@@ -6,11 +6,11 @@ Fairly basic set of tools for real-time data augmentation on the volumetric
 data. Extended for 3D objects augmentation.
 """
 import tensorflow as tf
-
-import tf.keras.backend as K
+from tensorflow import keras
+import tensorflow.keras.backend as K
 import numpy as np
 import scipy.ndimage
-from tf.keras.utils.data_utils import Sequence
+from tensorflow.keras.utils import Sequence
 from scipy import linalg
 from six.moves import range
 
