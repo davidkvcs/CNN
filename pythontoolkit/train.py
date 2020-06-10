@@ -209,7 +209,8 @@ class CNN():
         if not self.is_compiled:
             self.compile_network()
 
-        tf.keras.utils.plot_model(self.model, show_shapes=True, 
+        tf.keras.utils.plot_model(self.model, 
+            show_shapes=True, 
             to_file='model_fig.png')
 
     def train(self):

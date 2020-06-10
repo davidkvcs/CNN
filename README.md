@@ -43,6 +43,7 @@ make install
 ```
 ## POST INSTALLATION
 Add "source /opt/caai/toolkit-config.sh" to .bashrc / .bash_profile 
+TODO: toolkit-config.sh might need to be changed for every user by adding to /homes/<user>/ instead of /opt/caai
 
 ## KNOWN ISSUES
 
