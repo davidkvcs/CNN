@@ -12,17 +12,75 @@ import argparse
 
 
 # Define function
-def preprocess_dicom(input_path):
-    
+def preprocess_dicom(input_path, clobber = True):
     # Step 1: Convert dicom files to minc format, using the minc toolbox. All series present in the input folder will be converted.
-    subprocess.call('dcm2mnc -usecoordinates -fname "%N_%A%m" -dname "" ' + input_path + "/* " + input_path,shell=True)
+    #check if patient is already preprocessed
+    if ((os.path.exists(os.path.join(input_path,'dicom'))) & (clobber == True)):
+        print("MINC files already craeted. Now remaking these, as clobber = True")
+        source_path = os.path.join(input_path,'dicom')
+        destination_path = os.path.join(input_path,'minc')
+        subprocess.call('dcm2mnc -clobber -usecoordinates -fname "%N_%A%m" -dname "" ' + source_path + "/* " + destination_path, shell=True)
+    elif ((os.path.exists(os.path.join(input_path,'dicom'))) & (clobber == False)):
+        print("MINC files already craeted. Not preprocessing again, as clobber = False")
+    else:
+        print( "Creating MINC-files for patient.")
+        subprocess.call('dcm2mnc -usecoordinates -fname "%N_%A%m" -dname "" ' + input_path + "/* " + input_path, shell=True)
+    reorganize(input_path)
+
+def rename(input_path):
+    for root, dirs, files in os.walk(input_path):
+        for file in files:
+            if file.endswith(".mnc"):
+
+                # Extract pt name from minc header (patient# in this case):
+                proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0010:el_0x0010',shell=True,stdout=subprocess.PIPE)
+                output = proc.stdout.read()
+                pt = output.decode("utf-8")
+                pt = pt.rstrip()
+                
+                # Extract modality from minc header:
+                proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0008:el_0x0060',shell=True,stdout=subprocess.PIPE)
+                output = proc.stdout.read()
+                modality = output.decode("utf-8")
+                modality = modality.rstrip()
+                
+                # Extract unit type from minc header:
+                proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0028:el_0x1054',shell=True,stdout=subprocess.PIPE)
+                output = proc.stdout.read()
+                unit = output.decode("utf-8")
+                unit = unit.rstrip()
+                
+                # Create new name depending on attributes:
+                if modality == 'CT':
+                    new_name = pt+modality+'.mnc'
+                elif unit == 'BQML':
+                    new_name = pt+'PET_TrueX1.mnc'
+                else:
+                    new_name = pt+'AVG_TrueX1-6.mnc'
+                
+                # Rename minc file:
+                subprocess.call('mv '+(os.path.join(root, file))+' '+(os.path.join(root, new_name)),shell=True)
+
+def reorganize(input_path):
+    # Step 6: Organize files:
+    # Make folders:
+    subprocess.call('mkdir ' + input_path+'/dicom',shell=True)
+    subprocess.call('mkdir ' + input_path+'/minc',shell=True)
     
-    
+    # Move files
+    subprocess.call("mv " + os.path.join(input_path,"*.dcm ") + os.path.join(input_path,"dicom"), shell=True)
+    subprocess.call("mv " + os.path.join(input_path,"*.ima ") + os.path.join(input_path,"dicom"), shell=True)
+    subprocess.call("mv " + os.path.join(input_path,"*.DCM ") + os.path.join(input_path,"dicom"), shell=True)
+    subprocess.call("mv " + os.path.join(input_path,"*.mnc ") + os.path.join(input_path,"minc"), shell=True)
+    subprocess.call("mv " + os.path.join(input_path,"*.npy ") + os.path.join(input_path,"minc"), shell=True)
+
+
+'''
     # Step 2: Rename minc files.
     for root, dirs, files in os.walk(input_path):
         for file in files:
             if file.endswith(".mnc"):
-                
+
                 # Extract pt name from minc header (patient# in this case):
                 proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0010:el_0x0010',shell=True,stdout=subprocess.PIPE)
                 output = proc.stdout.read()
@@ -147,7 +205,7 @@ def preprocess_dicom(input_path):
     subprocess.call("mv " + os.path.join(input_path,"*.dcm ") + os.path.join(input_path,"dicom"), shell=True)
     subprocess.call("mv " + os.path.join(input_path,"*.mnc ") + os.path.join(input_path,"minc"), shell=True)
     subprocess.call("mv " + os.path.join(input_path,"*.npy ") + os.path.join(input_path,"minc"), shell=True)
-    
+'''    
 
 # Get dicom directory. The script can be run from the terminal with an input argument, 
 # such as: python3 preprocess_dicom.py --input /users/mathias/deeplearning_guide/patient_data_raw/patient2
