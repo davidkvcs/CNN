@@ -2,5 +2,5 @@
 #by running ./reinstall.sh in command-line
 mkdir build
 cd build
-cmake ..
+cmake .. -DCMAKE_INSTALL_PREFIX:PATH=/homes/kovacs/toolbox
 make install
