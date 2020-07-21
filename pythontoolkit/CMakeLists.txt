@@ -11,8 +11,7 @@ INSTALL(PROGRAMS
   networks.py
   train.py
   predict.py
-  preprocess_dicom.py
-  rtx2mnc.py
+  preprocess_dicom_dgk.py
   
   DESTINATION CAAI )
 
