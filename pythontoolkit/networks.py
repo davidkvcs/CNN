@@ -43,7 +43,7 @@ def unet(X, f, dims_out):
                                 kernel_initializer='he_normal', padding='same', strides=2)(layer)
         layer = BatchNormalization()(layer)
         layer = Activation('relu')(layer)
-        layer = concatenate([layer, concat], axis=-1)
+        layer = concatenate([layer, concat], axis=-1) 
         return layer
 
     # Dropout values

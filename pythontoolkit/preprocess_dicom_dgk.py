@@ -12,6 +12,8 @@ import pyminc.volumes.factory as pyminc
 import argparse
 #from CAAI import dcm
 from rhscripts.conversion import rtx_to_mnc
+from rhscripts.conversion import mnc_to_numpy
+from rhscripts.kbq2suv_dgk import kbq2suv
 from rhscripts import dcm
 
 # Define function
@@ -26,17 +28,35 @@ def preprocess_dicom(input_path, clobber = True):
         print("MINC files already craeted. Remaking these, as clobber = True")
         
         #convert dicom images to .mnc files
-        
-        subprocess.call('dcm2mnc -clobber -usecoordinates -fname "%N_%A%m" -dname "" ' + source_path + "/* " + destination_path, shell=True)
-        
+        subprocess.call('dcm2mnc -usecoordinates -fname "%N_%A%m" -dname "" ' + source_path + "/* " + destination_path, shell=True) #-clobber
+
         #rename mnc files based on modality
         rename(input_path)
-        
+
+        #get dicom file paths
+        rtstruct_ct_pt_path = get_rtstruct_ct_pet_filepath(source_path)
+
+        #convert pet files from kbq to suv
+        print('petfile_dicom = ' + rtstruct_ct_pt_path[2])
+        print('petfile_mnc = ' + os.path.join(destination_path,'PT.mnc'))
+        kbq2suv(rtstruct_ct_pt_path[2], os.path.join(destination_path,'PT.mnc'))
+
         #convert dicom structure files to .mnc
-        rtstruct_path = get_rtstruct_filepath(source_path)
-        rtstruct_container = get_rtx_dicom_container(destination_path, rtstruct_path)
-        rtstruct_destination = os.path.join(destination_path)
-        rtx_to_mnc(rtstruct_path, rtstruct_container, rtstruct_destination)
+        rtstruct_container = get_rtx_dicom_container(destination_path, rtstruct_ct_pt_path[0])
+        rtx_mnc_out_filepath = rtx_to_mnc(rtstruct_ct_pt_path[0], rtstruct_container, destination_path)
+
+
+        #resample PET file to the CT file - projectspecific
+        pt_mnc_path = rsl_pet_to_ct(destination_path)
+
+        #resample RTX file to the CT file - 
+        rtx_mnc_path = rsl_rtx_to_ct(destination_path, rtx_mnc_out_filepath)
+
+        #create and save ct .npy file (memmap)
+        ct_mnc_path = os.path.join(destination_path,'CT.mnc')
+        save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path)        
+    
+
     elif ((os.path.exists(os.path.join(input_path,'dicom'))) & (clobber == False)):
         #Not running again if clobber = false
         print("MINC files already craeted. Not preprocessing again, as clobber = False")
@@ -46,13 +66,86 @@ def preprocess_dicom(input_path, clobber = True):
         subprocess.call('dcm2mnc -usecoordinates -fname "%N_%A%m" -dname "" ' + input_path + "/* " + input_path, shell=True)
         reorganize(input_path)
         rename(input_path)
-        
+
+        #get dicom file paths
+        rtstruct_ct_pt_path = get_rtstruct_ct_pet_filepath(source_path)
+
+        #convert to suv
+        print('petfile_dicom = ' + rtstruct_ct_pt_path[2])
+        print('petfile_mnc = ' + os.path.join(destination_path,'PT.mnc'))
+        kbq2suv(rtstruct_ct_pt_path[2], os.path.join(destination_path,'PT.mnc'))
+
         #convert dicom structure files to .mnc
-        #get rtstruct path
-        rtstruct_path = get_rtstruct_filepath(source_path)
-        rtstruct_container = get_rtx_dicom_container(destination_path, rtstruct_path)
-        rtstruct_destination = os.path.join(destination_path, 'RTSTRUCT.mnc')
-        rtx_to_mnc(rtstruct_path, rtstruct_container, rtstruct_destination)
+        rtstruct_container = get_rtx_dicom_container(destination_path, rtstruct_ct_pt_path[0])
+        rtx_mnc_out_filepath = rtx_to_mnc(rtstruct_ct_pt_path[0], rtstruct_container, destination_path)
+
+        #resample PET file to the CT file - projectspecific
+        pt_mnc_path = rsl_pet_to_ct(destination_path)
+
+        #resample RTX file to the CT file - 
+        rtx_mnc_path = rsl_rtx_to_ct(destination_path, rtx_mnc_out_filepath)
+
+        #create and save ct .npy file (memmap)
+        ct_mnc_path = os.path.join(destination_path,'CT.mnc')
+        save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path)        
+
+
+def save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path):
+    #channel 1 holds CT, channel 2 holds pet, channel 3 holds structure
+    ct = mnc_to_numpy(ct_mnc_path, datatype = 'float32')
+    pt = mnc_to_numpy(pt_mnc_path, datatype = 'float32')
+    struct = mnc_to_numpy(rtx_mnc_path, datatype = 'bool')
+
+    dat = np.empty((ct.shape[0],ct.shape[1],ct.shape[2],3))
+    dat[...,0] = ct
+    dat[...,1] = pt
+    dat[...,2] = struct
+    print(dat.shape)
+
+    path = os.path.dirname(ct_mnc_path)
+    memmap_dat = np.memmap(path+'/dat.npy', dtype='float32', mode='w+', shape=dat.shape)
+    memmap_dat[:] = dat[:]
+    del memmap_dat
+
+def rsl_rtx_to_ct(destination_path, rtx_mnc_out_filepath):
+    #resample pet file like ct file
+    #and save an npy file with same name
+    
+    rtx_mnc_like_ct = os.path.join(destination_path, os.path.splitext(os.path.basename(rtx_mnc_out_filepath))[0]+'_rsl.mnc')
+    ct_mnc_file = os.path.join(destination_path,'CT.mnc')
+    subprocess.call('mincresample -clobber -nearest_neighbour ' + rtx_mnc_out_filepath + ' ' + rtx_mnc_like_ct + ' -like ' + ct_mnc_file, shell=True) #-clobber      
+    #delete the old pet file
+    os.remove(rtx_mnc_out_filepath)
+
+    return rtx_mnc_like_ct
+
+    #open generated mnc file and save as numpy memmep
+    #rtx_mnc_like_ct_np = mnc_to_numpy(rtx_mnc_like_ct)
+    #rtx_npy_like_ct = os.path.join(destination_path, os.path.splitext(os.path.basename(rtx_mnc_out_filepath))[0]+'_rsl.npy')
+    #rtx_mnc_like_ct_np_memmap = np.memmap(rtx_npy_like_ct, dtype = 'bool', mode = 'w+', shape = rtx_mnc_like_ct_np.shape)
+    #rtx_mnc_like_ct_np_memmap[:] = rtx_mnc_like_ct_np[:]
+
+def rsl_pet_to_ct(destination_path):
+    #resample pet file like ct file
+    #and save an npy file with same name
+
+    pt_mnc_file = os.path.join(destination_path,'PT.mnc')
+    pt_mnc_suv_file = os.path.join(destination_path,'PTsuv.mnc')
+    pt_mnc_like_ct = os.path.join(destination_path,'PTsuv_rsl.mnc')
+    ct_mnc_file = os.path.join(destination_path,'CT.mnc')
+    subprocess.call('mincresample -clobber ' + pt_mnc_suv_file + ' ' + pt_mnc_like_ct + ' -like ' + ct_mnc_file, shell=True) #-clobber      
+    #delete the old pet file
+    os.remove(pt_mnc_file)
+    os.remove(pt_mnc_suv_file)
+
+    return pt_mnc_like_ct
+ 
+    #open generated mnc file and save as numpy memmep
+    #pt_mnc_like_ct_np = mnc_to_numpy(pt_mnc_like_ct)
+    #pt_npy_like_ct = os.path.join(destination_path, os.path.splitext(os.path.basename(pt_mnc_suv_file))[0]+'_rsl.npy')
+    #pt_mnc_like_ct_np_memmap = np.memmap(pt_npy_like_ct, dtype = 'float32', mode = 'w+', shape = pt_mnc_like_ct_np.shape)
+    #pt_mnc_like_ct_np_memmap[:] = pt_mnc_like_ct_np[:]
+
 
 def get_rtx_dicom_container(destination_path, rtstruct_path):
     #get PET series, CT series and "RTstruct reference series" UID
@@ -78,22 +171,37 @@ def get_dicom_image_uid(input_path):
     return image_series_uid
 
 #rename dicom files according to modality
-def get_rtstruct_filepath(input_path):
+def get_rtstruct_ct_pet_filepath(input_path):
     '''
     Get modcality information from all files in header and return table with info
     Inputs: Path to a dicom directory
-
+    
+    Outputs:
+        - file holding path to rtstruct
+        - file holding path to one ct dicom file
+        - file holding path to one pet dicom file
+    
     TODO: Currently works if there is maximum of 1 RTSTRUCT file.
+
     '''
     extensions = [".ima", ".IMA", ".dcm", ".DCM"]
     for root, dirs, files in os.walk(input_path):
         #check if rtstruct_file.txt already exists
-        output_filename = os.path.join(root,'rtstruct_file.txt')
-        if os.path.isfile(output_filename) == True:
-            with open(output_filename, 'r') as file:
-                filepath = file.read().replace('\n', '')
-                print('rtstruct_file.txt already exists and was loaded.')
-                return filepath
+        output_rtx_filename = os.path.join(root,'rtx_file.txt')
+        output_ct_filename = os.path.join(root,'ct_file.txt')
+        output_pt_filename = os.path.join(root,'pt_file.txt')
+        if os.path.isfile(output_rtx_filename) == True:
+            with open(output_rtx_filename, 'r') as file:
+                rtx_filepath = file.read().replace('\n', '')
+                print('rtx_file.txt already exists and was loaded.')
+        if os.path.isfile(output_ct_filename) == True:
+            with open(output_ct_filename, 'r') as file:
+                ct_filepath = file.read().replace('\n', '')
+                print('ct_file.txt already exists and was loaded.')
+        if os.path.isfile(output_pt_filename) == True:
+            with open(output_pt_filename, 'r') as file:
+                pt_filepath = file.read().replace('\n', '')
+                print('pt_file.txt already exists and was loaded.')
         else:
             for file in files:
                 filepath = os.path.join(root, file)
@@ -102,12 +210,26 @@ def get_rtstruct_filepath(input_path):
                         modality = dcm.get_modality(filepath)
                         if modality == "RTSTRUCT":
                             #Save path to file, so this only runs once.
-                            output_file = open(output_filename, 'w')
+                            output_file = open(output_rtx_filename, 'w')
                             output_file.write(filepath)
                             output_file.close()
-                            print('Saved path to rtstruct in rtstruct_file.txt')
-                            return filepath
-
+                            #print('Saved path to rtstruct in rtstruct_file.txt')
+                            rtx_filepath = filepath
+                        elif modality == "CT":
+                            #Save path to file, so this only runs once.
+                            output_file = open(output_ct_filename, 'w')
+                            output_file.write(filepath)
+                            output_file.close()
+                            #print('Saved path to rtstruct in rtstruct_file.txt')
+                            ct_filepath = filepath
+                        elif modality == "PT":
+                            #Save path to file, so this only runs once.
+                            output_file = open(output_pt_filename, 'w')
+                            output_file.write(filepath)
+                            output_file.close()
+                            #print('Saved path to rtstruct in rtstruct_file.txt')
+                            pt_filepath = filepath
+        return rtx_filepath, ct_filepath, pt_filepath
 
 def rename(input_path):
     for root, dirs, files in os.walk(input_path):
@@ -156,76 +278,7 @@ def reorganize(input_path):
     subprocess.call("mv " + os.path.join(input_path,"*.mnc ") + os.path.join(input_path,"minc"), shell=True)
    # subprocess.call("mv " + os.path.join(input_path,"*.npy ") + os.path.join(input_path,"minc"), shell=True)
 
-
 '''
-    # Step 2: Rename minc files.
-    for root, dirs, files in os.walk(input_path):
-        for file in files:
-            if file.endswith(".mnc"):
-
-                # Extract pt name from minc header (patient# in this case):
-                proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0010:el_0x0010',shell=True,stdout=subprocess.PIPE)
-                output = proc.stdout.read()
-                pt = output.decode("utf-8")
-                pt = pt.rstrip()
-                
-                # Extract modality from minc header:
-                proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0008:el_0x0060',shell=True,stdout=subprocess.PIPE)
-                output = proc.stdout.read()
-                modality = output.decode("utf-8")
-                modality = modality.rstrip()
-                
-                # Extract unit type from minc header:
-                proc = subprocess.Popen('mincinfo '+(os.path.join(root, file))+' -attvalue dicom_0x0028:el_0x1054',shell=True,stdout=subprocess.PIPE)
-                output = proc.stdout.read()
-                unit = output.decode("utf-8")
-                unit = unit.rstrip()
-                
-                # Create new name depending on attributes:
-                if modality == 'CT':
-                    new_name = pt+modality+'.mnc'
-                elif unit == 'BQML':
-                    new_name = pt+'PET_TrueX1.mnc'
-                else:
-                    new_name = pt+'AVG_TrueX1-6.mnc'
-                
-                # Rename minc file:
-                subprocess.call('mv '+(os.path.join(root, file))+' '+(os.path.join(root, new_name)),shell=True)
-    
-    
-    # Step 3: Resizing of PET files from 400 to 256. Output file is given the extension _reshaped:
-                
-    # Loop through input folder to find .mnc PET files, that has not been reshaped already.
-    for root, dirs, files in os.walk(input_path):
-        for file in files:
-            if file.endswith(".mnc") and file.find("PET")!=-1 and file.find("reshaped")==-1:
-                
-                # Reshapes .mnc PET files using the MINC toolbox.
-                subprocess.call("mincreshape -clobber "+os.path.join(root, file)+" "+os.path.join(root, file)[:-4]\
-                                +"_reshaped.mnc"+" -start 0,72,72 -count 111,256,256",shell=True)
-    
-    for root, dirs, files in os.walk(input_path):
-        for file in files:
-            if file.endswith(".mnc") and file.find("AVG")!=-1 and file.find("reshaped")==-1:
-                
-                # Reshapes .mnc PET files using the MINC toolbox.
-                subprocess.call("mincreshape -clobber "+os.path.join(root, file)+" "+os.path.join(root, file)[:-4]\
-                                +"_reshaped.mnc"+" -start 0,72,72 -count 111,256,256",shell=True)
-    
-    
-    # Step 4: Register CT to PET image. Output file is given the extension _resampled:
-       
-    # Loop through input folder to find .mnc CT files, that has not been resampled already.
-    for root, dirs, files in os.walk(input_path):
-        for file in files:
-            if file.endswith(".mnc") and file.find("CT")!=-1 and file.find("resampled")==-1:
-                
-                # Resamples .mnc CT files using the MINC toolbox.
-                subprocess.call("mincresample "+os.path.join(root, file)+" "+os.path.join(root, file)[:-4]+\
-                                "_resampled.mnc"+" -like "+os.path.join(root,pt + "PET_TrueX1_reshaped.mnc")+\
-                                " -clobber -fillvalue -1024",shell=True)   
-    
-    
     # Step 5: Create numpy arrays.
     
     _ct_name = "CT_resampled.mnc"
@@ -236,7 +289,7 @@ def reorganize(input_path):
     _res_name = "res_256_truex1_256_CT.npy"
     
     scale = 1 #scales the reference in the residual calculation: ref/scale. No need for scaling of breathhold data.
-    
+
     # Load PET/CT input
     _lowdose = pyminc.volumeFromFile(os.path.join(input_path,pt+_lowdose_name)) # Load minc file
     _ct = pyminc.volumeFromFile(os.path.join(input_path,pt+_ct_name)) # Load minc file
@@ -275,7 +328,6 @@ def reorganize(input_path):
     memmap_res[:] = residual[:]
             
     del memmap_res
-    
     
     # Step 6: Organize files:
     
