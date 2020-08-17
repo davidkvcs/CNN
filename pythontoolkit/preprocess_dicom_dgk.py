@@ -45,6 +45,8 @@ def preprocess_dicom(input_path, clobber = True):
         rtstruct_container = get_rtx_dicom_container(destination_path, rtstruct_ct_pt_path[0])
         rtx_mnc_out_filepath = rtx_to_mnc(rtstruct_ct_pt_path[0], rtstruct_container, destination_path)
 
+        #OPTIONAL: RESAMPLE CT TO 256 - rest will later be resample to 256 as well
+        subprocess.call('mincreshape -clobber -rowsize 256 -colsize 256 ' + os.path.join(destination_path,'CT.mnc') + ' ' + os.path.join(destination_path,'CT256.mnc') , shell = True)
 
         #resample PET file to the CT file - projectspecific
         pt_mnc_path = rsl_pet_to_ct(destination_path)
@@ -53,9 +55,9 @@ def preprocess_dicom(input_path, clobber = True):
         rtx_mnc_path = rsl_rtx_to_ct(destination_path, rtx_mnc_out_filepath)
 
         #create and save ct .npy file (memmap)
-        ct_mnc_path = os.path.join(destination_path,'CT.mnc')
-        save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path)        
-    
+        ct_mnc_path = os.path.join(destination_path,'CT256.mnc')
+        save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path)    
+        os.remove(os.path.join(destination_path,'CT.mnc'))    
 
     elif ((os.path.exists(os.path.join(input_path,'dicom'))) & (clobber == False)):
         #Not running again if clobber = false
@@ -79,6 +81,9 @@ def preprocess_dicom(input_path, clobber = True):
         rtstruct_container = get_rtx_dicom_container(destination_path, rtstruct_ct_pt_path[0])
         rtx_mnc_out_filepath = rtx_to_mnc(rtstruct_ct_pt_path[0], rtstruct_container, destination_path)
 
+        #OPTIONAL: RESAMPLE CT TO 256 - rest will later be resample to 256 as well
+        subprocess.call('mincreshape -clobber -rowsize 256 -colsize 256 ' + os.path.join(destination_path,'CT.mnc') + ' ' + os.path.join(destination_path,'CT256.mnc') , shell = True)
+
         #resample PET file to the CT file - projectspecific
         pt_mnc_path = rsl_pet_to_ct(destination_path)
 
@@ -86,33 +91,47 @@ def preprocess_dicom(input_path, clobber = True):
         rtx_mnc_path = rsl_rtx_to_ct(destination_path, rtx_mnc_out_filepath)
 
         #create and save ct .npy file (memmap)
-        ct_mnc_path = os.path.join(destination_path,'CT.mnc')
-        save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path)        
+        ct_mnc_path = os.path.join(destination_path,'CT256.mnc')
+        save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path)   
+        os.remove(os.path.join(destination_path,'CT.mnc'))    
 
 
 def save_dat_memmap(ct_mnc_path,pt_mnc_path,rtx_mnc_path):
     #channel 1 holds CT, channel 2 holds pet, channel 3 holds structure
-    ct = mnc_to_numpy(ct_mnc_path, datatype = 'float32')
-    pt = mnc_to_numpy(pt_mnc_path, datatype = 'float32')
-    struct = mnc_to_numpy(rtx_mnc_path, datatype = 'bool')
+    ct = normalize_image(mnc_to_numpy(ct_mnc_path, datatype = 'float32'))
+    pt = normalize_image(mnc_to_numpy(pt_mnc_path, datatype = 'float32'))
+    struct = mnc_to_numpy(rtx_mnc_path, datatype = 'float32')
 
-    dat = np.empty((ct.shape[0],ct.shape[1],ct.shape[2],3))
+    dat = np.empty((ct.shape[0],ct.shape[1],ct.shape[2],2))
+    tgt = np.empty((ct.shape[0]))
     dat[...,0] = ct
     dat[...,1] = pt
-    dat[...,2] = struct
+    #tgt[...,2] = struct
     print(dat.shape)
 
     path = os.path.dirname(ct_mnc_path)
     memmap_dat = np.memmap(path+'/dat.npy', dtype='float32', mode='w+', shape=dat.shape)
     memmap_dat[:] = dat[:]
+
+    memmap_tgt = np.memmap(path+'/tgt.npy', dtype='float32', mode='w+', shape=struct.shape)
+    memmap_tgt[:] = struct[:]
+
     del memmap_dat
+    del memmap_tgt
+
+
+def normalize_image(image):
+    im_max = np.amax(image)
+    im_min = np.amin(image)
+    return (image-im_min)/(im_max-im_min) 
+
 
 def rsl_rtx_to_ct(destination_path, rtx_mnc_out_filepath):
     #resample pet file like ct file
     #and save an npy file with same name
     
     rtx_mnc_like_ct = os.path.join(destination_path, os.path.splitext(os.path.basename(rtx_mnc_out_filepath))[0]+'_rsl.mnc')
-    ct_mnc_file = os.path.join(destination_path,'CT.mnc')
+    ct_mnc_file = os.path.join(destination_path,'CT256.mnc')
     subprocess.call('mincresample -clobber -nearest_neighbour ' + rtx_mnc_out_filepath + ' ' + rtx_mnc_like_ct + ' -like ' + ct_mnc_file, shell=True) #-clobber      
     #delete the old pet file
     os.remove(rtx_mnc_out_filepath)
@@ -132,7 +151,7 @@ def rsl_pet_to_ct(destination_path):
     pt_mnc_file = os.path.join(destination_path,'PT.mnc')
     pt_mnc_suv_file = os.path.join(destination_path,'PTsuv.mnc')
     pt_mnc_like_ct = os.path.join(destination_path,'PTsuv_rsl.mnc')
-    ct_mnc_file = os.path.join(destination_path,'CT.mnc')
+    ct_mnc_file = os.path.join(destination_path,'CT256.mnc')
     subprocess.call('mincresample -clobber ' + pt_mnc_suv_file + ' ' + pt_mnc_like_ct + ' -like ' + ct_mnc_file, shell=True) #-clobber      
     #delete the old pet file
     os.remove(pt_mnc_file)

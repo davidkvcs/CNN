@@ -56,15 +56,19 @@ class CNN():
         self.custom_network_architecture = None
         
         # Metrics and loss functions
-        self.loss_functions = [ ['mse',1] ]
+        self.config['loss_functions'] = [ ['mse',1] ]
         self.metrics = ['accuracy']
         self.custom_objects = dict()
         self.is_compiled = False
 
         # Update with overwritten params
         for k,v in kwargs.items():
+            #print('k = ' + str(k))
+            #print('v = ' + str(v))
             if k in self.config:
                 self.config[k] = v
+            #if k in self.loss_functions = v: 
+
                 
         # Update train and valid flags after pickle has been set
         self.config["train_pts"] = 'train' if self.config['data_pickle_kfold'] is None else 'train_{}'.format(self.config['data_pickle_kfold'])
@@ -116,10 +120,15 @@ class CNN():
                 self.model = self.build_network()
         
             optimizer = Adam(self.config['learning_rate'])
-            loss, loss_weights = zip(*self.loss_functions)
+            loss, loss_weights = zip(*self.config['loss_functions'])
             loss = list(loss)
+            #check if loss is custom
+            if loss[0] == 'custom':
+                #attach loss function to loss
+                loss = self.custom_objects[self.config['loss_functions'][0][0]] 
+                print('Added custom loss function =' + str(loss))
             loss_weights = list(loss_weights)
-            
+            print('LOSS = ' + str(loss))
             self.model.compile(loss = loss, loss_weights = loss_weights, optimizer = optimizer, metrics=self.metrics)
             
         self.is_compiled = True
@@ -141,6 +150,17 @@ class CNN():
             
         if self.config['network_architecture'] == 'unet':
             outputs = networks.unet(inputs,f=self.config['n_base_filters'],dims_out=self.config['output_channels'])
+
+        elif self.config['network_architecture'] == 'unet_dgk_test':
+            outputs = networks.unet_dgk_test(inputs,f=self.config['n_base_filters'],dims_out=self.config['output_channels'])
+
+        elif self.config['network_architecture'] == 'unet_2D_amalie':
+            outputs = networks.unet_2D_amalie(inputs, img_shape = self.config['input_patch_shape']+(self.config['input_channels'],))#f=self.config['n_base_filters'],dims_out=self.config['output_channels']
+
+
+        elif self.config['network_architecture'] == 'unet_2D_david':
+            outputs = networks.unet_2D_david(inputs, f=self.config['n_base_filters'],dims_out=self.config['output_channels'])#f=self.config['n_base_filters'],dims_out=self.config['output_channels']
+
             
         elif self.config['network_architecture'] == 'custom' and not self.custom_network_architecture == None:
             outputs = self.custom_network_architecture(inputs,config=self.config)
@@ -204,13 +224,13 @@ class CNN():
     def set(self,key,value):
         self.config[key] = value
 
-    def plot_model(self):
+    def plot_model(self, path = None):
         # Compile network if it has not been done:
         if not self.is_compiled:
             self.compile_network()
 
         tf.keras.utils.plot_model(self.model, show_shapes=True, 
-            to_file='model_fig.png')
+            to_file=(path + 'model_fig.png'))
 
     def train(self):
 
