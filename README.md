@@ -99,7 +99,6 @@ cnn.train()
 Use of custom losses
 
 ```
-from networks import customNET
 from CAAI.losses import rmse
 
 cnn = CNN(model_name='v1',
@@ -108,8 +107,8 @@ cnn = CNN(model_name='v1',
       )
 cnn.data_loader = DataGenerator(cnn.config)  
 
-cnn.loss_functions=[[rmse,1]]
-cnn.custom_objects['rmse'] = rmse
+cnn.loss_functions=[['custom',1]], # [[<LOSS>, <WEIGHTS>]]
+cnn.custom_objects['custom'] = rmse #rmse or any other loss function with the signature loss = fn(y_true, y_pred)
 cnn.compile_network()
 
 cnn.train()    
