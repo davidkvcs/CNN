@@ -212,15 +212,15 @@ def get_rtstruct_ct_pet_filepath(input_path):
         if os.path.isfile(output_rtx_filename) == True:
             with open(output_rtx_filename, 'r') as file:
                 rtx_filepath = file.read().replace('\n', '')
-                print('rtx_file.txt already exists and was loaded.')
+                #print('rtx_file.txt already exists and was loaded.')
         if os.path.isfile(output_ct_filename) == True:
             with open(output_ct_filename, 'r') as file:
                 ct_filepath = file.read().replace('\n', '')
-                print('ct_file.txt already exists and was loaded.')
+                #print('ct_file.txt already exists and was loaded.')
         if os.path.isfile(output_pt_filename) == True:
             with open(output_pt_filename, 'r') as file:
                 pt_filepath = file.read().replace('\n', '')
-                print('pt_file.txt already exists and was loaded.')
+                #print('pt_file.txt already exists and was loaded.')
         else:
             for file in files:
                 filepath = os.path.join(root, file)
